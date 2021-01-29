@@ -1,0 +1,59 @@
+create or replace view REFLECTOR_DEV_DATABASE.STG_CLONE_2.NORMALIZED_BUFFER_SHOPIFY_ORDER_SHIPPING_LINES as (
+   select
+        -- meta info
+        silo_id::varchar as _silo_id,
+        source_id::varchar as _source_id,
+        batch_id::varchar as _batch_id,
+        sync_id::varchar as _sync_id,
+        insert_time::varchar as _insert_time,
+        line_item.value:id::varchar as _eid,
+        concat_ws(
+            ':',
+            'shopify_order_line_item',
+            _silo_id,
+            line_item.value:id
+        ) as _uid,
+-- relationships
+        line_item.index::integer as _index,
+        concat_ws(
+            ':',
+            'shopify_order',
+            _silo_id,
+            src:id
+        ) as _order_uid,
+        concat_ws(
+            ':',
+            'shopify_product',
+            _silo_id,
+            line_item.value:product_id
+        ) as _product_uid,
+        concat_ws(
+            ':',
+            'shopify_product_variant',
+            _silo_id,
+            line_item.value:variant_id
+        ) as _variant_uid,
+-- raw fields
+        line_item.value:id::varchar as id,
+        line_item.value:fulfillable_quantity::integer as fulfillable_quantity,
+        line_item.value:fulfillment_service::varchar as fulfillment_service,
+        line_item.value:fulfillment_status::varchar as fulfillment_status,
+        line_item.value:grams::integer as grams,
+        line_item.value:price::decimal(36, 2) as price,
+        line_item.value:quantity::integer as quantity,
+        line_item.value:requires_shipping::boolean as requires_shipping,
+        line_item.value:sku::varchar as sku,
+        line_item.value:title::varchar as title,
+        line_item.value:name::varchar as name,
+        line_item.value:gift_card::boolean as gift_card,
+        line_item.value:taxable::boolean as taxable,
+        line_item.value:total_discount::decimal(36, 2) as total_discount,
+        ifnull(line_item.value:tax_lines[0]:price::decimal(36, 2), 0) as tax_lines_price,
+        ifnull(line_item.value:tax_lines[0]:rate::decimal(36, 2), 0) as tax_lines_rate,
+        src:created_at::timestamp_tz as order_created_at,
+        src:updated_at::timestamp_tz as order_updated_at,
+        src:processed_at::timestamp_tz as order_processed_at
+    from raw_data_buffer,
+        lateral flatten(input => src:shipping_lines) line_item
+    where record_type = 'shopify_order'
+);
